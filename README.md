@@ -50,8 +50,8 @@ GeoIP databases.
 
 - [ ] MaxMind MMDB format support
   - [ ] Country databases
-   - [x] Read (via https://github.com/oschwald/maxminddb-golang)
-   - [ ] Write
+    - [x] Read (via https://github.com/oschwald/maxminddb-golang)
+    - [ ] Write
   - [ ] City databases
   - [ ] AS number databases
   
