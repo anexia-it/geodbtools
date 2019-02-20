@@ -1,0 +1,28 @@
+project_name: geodbtools
+
+builds:
+  - main: ./cmd/geodbtool/
+    binary: geodbtool
+    ldflags: -s -w
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+
+archive:
+  format: tar.gz
+  wrap_in_directory: true
+  files:
+    - README.md
+    - LICENSE
+
+release:
+  github:
+    owner: anexia-it
+    name: geodbtools
+  draft: false
+  prerelease: false

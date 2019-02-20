@@ -17,6 +17,16 @@ script:
   - git submodule update --init --recursive
   - /bin/bash ./scripts/ci_checks.sh
 
+deploy:
+  - provider: script
+    skip_cleanup: true
+    script: curl -sL http://git.io/goreleaser | bash
+    on:
+      tags: true
+      condition: $TRAVIS_OS_NAME = linux
+      go: "1.11"
+
 after_success:
   - mv ./cover/coverage.cov ./coverage.txt
   - bash <(curl -s https://codecov.io/bash)
+  - rm -f ./coverage.txt
