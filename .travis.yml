@@ -5,7 +5,7 @@ matrix:
   include:
     - go: "1.10"
     - go: "1.11"
-      script: diff -u <(echo -n) <(gofmt -d -s .)
+    - go: "tip"
 
 branches:
   only:
