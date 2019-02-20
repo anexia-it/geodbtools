@@ -1,0 +1,22 @@
+language: go
+sudo: false
+
+matrix:
+  include:
+    - go: "1.10"
+    - go: "1.11"
+      script: diff -u <(echo -n) <(gofmt -d -s .)
+
+branches:
+  only:
+    - master
+    - /v\d+\.\d+\.\d+/
+    
+script:
+  - git submodule sync --recursive
+  - git submodule update --init --recursive
+  - /bin/bash ./scripts/ci_checks.sh
+
+after_success:
+  - mv ./cover/coverage.cov ./coverage.txt
+  - bash <(curl -s https://codecov.io/bash)

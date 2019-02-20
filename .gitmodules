@@ -1,0 +1,3 @@
+[submodule "mmdbformat/test-data"]
+	path = mmdbformat/test-data
+	url = https://github.com/maxmind/MaxMind-DB.git

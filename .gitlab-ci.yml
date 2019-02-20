@@ -1,0 +1,45 @@
+image: golang:1.10
+
+stages:
+  - precheck
+  - test
+  - build
+
+before_script:
+  - mkdir -p /go/src/github.com/anexia-it /go/bin
+  - cp -r $CI_PROJECT_DIR /go/src/github.com/anexia-it/geodbtools
+  - cd /go/src/github.com/anexia-it/geodbtools
+  - git submodule sync --recursive
+  - git submodule update --init --recursive
+
+precheck:format:
+  stage: precheck
+  script:
+    - /bin/bash ./scripts/format.sh github.com/anexia-it/geodbtools
+    - diff -u <(echo -n) <(git diff)
+
+precheck:lint:
+  stage: precheck
+  script:
+    - /bin/bash ./scripts/lint.sh github.com/anexia-it/geodbtools
+
+precheck:vet:
+  stage: precheck
+  script:
+    - /bin/bash ./scripts/vet.sh github.com/anexia-it/geodbtools
+
+precheck:staticcheck:
+  stage: precheck
+  script:
+    - /bin/bash ./scripts/staticcheck.sh github.com/anexia-it/geodbtools
+
+test:
+  stage: test
+  coverage: '/> combined coverage: \d+\.\d+%/'
+  script:
+    - /bin/bash ./scripts/coverage.sh github.com/anexia-it/geodbtools
+
+binaries:
+  stage: build
+  script:
+    - /bin/bash ./scripts/build.sh github.com/anexia-it/geodbtools
