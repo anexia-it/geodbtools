@@ -154,7 +154,7 @@ var cmdConvert = &cobra.Command{
 		}
 
 		var outputFile *os.File
-		if outputFile, err = os.OpenFile(outputPath, os.O_WRONLY|os.O_TRUNC|os.O_EXCL, 0600); err != nil {
+		if outputFile, err = os.OpenFile(outputPath, os.O_WRONLY|os.O_TRUNC|os.O_EXCL|os.O_CREATE, 0600); err != nil {
 			return
 		}
 
