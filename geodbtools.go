@@ -10,7 +10,7 @@ const (
 	// VersionMinor defines the minor version number of geodbtools
 	VersionMinor = 0
 	// VersionPatch defines the patch version number of geodbtools
-	VersionPatch = 0
+	VersionPatch = 1
 )
 
 // VersionString returns the complete version as a string
