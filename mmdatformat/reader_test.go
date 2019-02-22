@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/anexia-it/geodbtools"
 	"github.com/golang/mock/gomock"
@@ -12,46 +11,6 @@ import (
 )
 
 func TestNewReader(t *testing.T) {
-	t.Run("OK", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		reader := NewMockReader(ctrl)
-
-		dbType := NewMockType(ctrl)
-		dbType.EXPECT().DatabaseType().AnyTimes().Return(geodbtools.DatabaseType("test"))
-		dbType.EXPECT().NewReader(gomock.Any(), DatabaseTypeIDBase, "TestDB", nil).Return(reader, geodbtools.Metadata{
-			Type: "test generated",
-		}, nil)
-
-		typeRegistryMu.Lock()
-		originalTypeRegistry := typeRegistry
-		typeRegistry = map[DatabaseTypeID]Type{
-			DatabaseTypeIDBase: dbType,
-		}
-		typeRegistryMu.Unlock()
-
-		defer func() {
-			typeRegistryMu.Lock()
-			defer typeRegistryMu.Unlock()
-			typeRegistry = originalTypeRegistry
-		}()
-
-		testData := bytes.Repeat([]byte{0x00}, databaseInfoMaxSize)
-		testData = append(testData, []byte("TestDB")...)
-		testData = append(testData, []byte{0x00, 0xff, 0xff, 0xff, byte(DatabaseTypeIDBase)}...)
-
-		readerSource := &testReaderSource{
-			Reader: bytes.NewReader(testData),
-			size:   int64(len(testData)),
-		}
-
-		r, meta, err := NewReader(readerSource)
-		assert.NoError(t, err)
-		assert.EqualValues(t, "test generated", meta.Type)
-		assert.EqualValues(t, reader, r)
-	})
-
 	t.Run("Short", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -259,17 +218,24 @@ func TestNewReader(t *testing.T) {
 		assert.EqualError(t, err, ErrTypeNotFound.Error())
 	})
 
-	t.Run("OKDatabaseTypeOffset", func(t *testing.T) {
+	t.Run("OK", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		reader := NewMockReader(ctrl)
+		testData := bytes.Repeat([]byte{0x00}, databaseInfoMaxSize)
+		testData = append(testData, []byte("TestDB")...)
+		testData = append(testData, []byte{0x00, 0xff, 0xff, 0xff, byte(DatabaseTypeIDBase)}...)
+
+		readerSource := &testReaderSource{
+			Reader: bytes.NewReader(testData),
+			size:   int64(len(testData)),
+		}
 
 		dbType := NewMockType(ctrl)
 		dbType.EXPECT().DatabaseType().AnyTimes().Return(geodbtools.DatabaseType("test"))
-		dbType.EXPECT().NewReader(gomock.Any(), DatabaseTypeIDBase, "TestDB", nil).Return(reader, geodbtools.Metadata{
-			Type: "test generated",
-		}, nil)
+		dbType.EXPECT().RecordLength(DatabaseTypeIDBase).Return(uint(3))
+		dbType.EXPECT().IPVersion(DatabaseTypeIDBase).Return(geodbtools.IPVersion4)
+		dbType.EXPECT().DatabaseSegmentOffset(readerSource, DatabaseTypeIDBase, int64(19)).Return(countryBegin)
 
 		typeRegistryMu.Lock()
 		originalTypeRegistry := typeRegistry
@@ -283,6 +249,23 @@ func TestNewReader(t *testing.T) {
 			defer typeRegistryMu.Unlock()
 			typeRegistry = originalTypeRegistry
 		}()
+
+		r, meta, err := NewReader(readerSource)
+		assert.NoError(t, err)
+		assert.EqualValues(t, "test", meta.Type)
+		if !assert.NotNil(t, r) && assert.IsType(t, &GenericReader{}, r) {
+			gr := r.(*GenericReader)
+			assert.EqualValues(t, readerSource, gr.source)
+			assert.EqualValues(t, 3, gr.recordLength)
+			assert.EqualValues(t, dbType, gr.readerType)
+			assert.EqualValues(t, countryBegin, gr.dbSegmentOffset)
+			assert.False(t, gr.isIPv6)
+		}
+	})
+
+	t.Run("OKDatabaseTypeOffset", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
 
 		testData := bytes.Repeat([]byte{0x00}, databaseInfoMaxSize)
 		testData = append(testData, []byte("TestDB")...)
@@ -293,30 +276,11 @@ func TestNewReader(t *testing.T) {
 			size:   int64(len(testData)),
 		}
 
-		r, meta, err := NewReader(readerSource)
-		assert.NoError(t, err)
-		assert.EqualValues(t, "test generated", meta.Type)
-		assert.EqualValues(t, reader, r)
-	})
-
-	t.Run("OKWithBuildTime", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		reader := NewMockReader(ctrl)
-
 		dbType := NewMockType(ctrl)
 		dbType.EXPECT().DatabaseType().AnyTimes().Return(geodbtools.DatabaseType("test"))
-		dbType.EXPECT().NewReader(gomock.Any(), DatabaseTypeIDBase, "TestDB 20190215", gomock.Any()).DoAndReturn(func(source geodbtools.ReaderSource, dbType DatabaseTypeID, dbInfo string, buildTime *time.Time) (r geodbtools.Reader, meta geodbtools.Metadata, err error) {
-			r = reader
-			if assert.NotNil(t, buildTime) {
-				meta = geodbtools.Metadata{
-					BuildTime: *buildTime,
-					Type:      "test generated",
-				}
-			}
-			return
-		})
+		dbType.EXPECT().RecordLength(DatabaseTypeIDBase).Return(uint(3))
+		dbType.EXPECT().IPVersion(DatabaseTypeIDBase).Return(geodbtools.IPVersion4)
+		dbType.EXPECT().DatabaseSegmentOffset(readerSource, DatabaseTypeIDBase, int64(19)).Return(countryBegin)
 
 		typeRegistryMu.Lock()
 		originalTypeRegistry := typeRegistry
@@ -331,6 +295,23 @@ func TestNewReader(t *testing.T) {
 			typeRegistry = originalTypeRegistry
 		}()
 
+		r, meta, err := NewReader(readerSource)
+		assert.NoError(t, err)
+		assert.EqualValues(t, "test", meta.Type)
+		if !assert.NotNil(t, r) && assert.IsType(t, &GenericReader{}, r) {
+			gr := r.(*GenericReader)
+			assert.EqualValues(t, readerSource, gr.source)
+			assert.EqualValues(t, 3, gr.recordLength)
+			assert.EqualValues(t, dbType, gr.readerType)
+			assert.EqualValues(t, countryBegin, gr.dbSegmentOffset)
+			assert.False(t, gr.isIPv6)
+		}
+	})
+
+	t.Run("OKWithBuildTime", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
 		testData := bytes.Repeat([]byte{0x00}, databaseInfoMaxSize)
 		testData = append(testData, []byte("TestDB 20190215")...)
 		testData = append(testData, []byte{0x00, 0xff, 0xff, 0xff, byte(DatabaseTypeIDBase - DatabaseTypeIDBase)}...)
@@ -340,12 +321,38 @@ func TestNewReader(t *testing.T) {
 			size:   int64(len(testData)),
 		}
 
+		dbType := NewMockType(ctrl)
+		dbType.EXPECT().DatabaseType().AnyTimes().Return(geodbtools.DatabaseType("test"))
+		dbType.EXPECT().RecordLength(DatabaseTypeIDBase).Return(uint(3))
+		dbType.EXPECT().IPVersion(DatabaseTypeIDBase).Return(geodbtools.IPVersion4)
+		dbType.EXPECT().DatabaseSegmentOffset(readerSource, DatabaseTypeIDBase, int64(19)).Return(countryBegin)
+
+		typeRegistryMu.Lock()
+		originalTypeRegistry := typeRegistry
+		typeRegistry = map[DatabaseTypeID]Type{
+			DatabaseTypeIDBase: dbType,
+		}
+		typeRegistryMu.Unlock()
+
+		defer func() {
+			typeRegistryMu.Lock()
+			defer typeRegistryMu.Unlock()
+			typeRegistry = originalTypeRegistry
+		}()
+
 		r, meta, err := NewReader(readerSource)
 		assert.NoError(t, err)
-		assert.EqualValues(t, "test generated", meta.Type)
+		assert.EqualValues(t, "test", meta.Type)
 		assert.EqualValues(t, 2019, meta.BuildTime.Year())
 		assert.EqualValues(t, 2, meta.BuildTime.Month())
 		assert.EqualValues(t, 15, meta.BuildTime.Day())
-		assert.EqualValues(t, reader, r)
+		if !assert.NotNil(t, r) && assert.IsType(t, &GenericReader{}, r) {
+			gr := r.(*GenericReader)
+			assert.EqualValues(t, readerSource, gr.source)
+			assert.EqualValues(t, 3, gr.recordLength)
+			assert.EqualValues(t, dbType, gr.readerType)
+			assert.EqualValues(t, countryBegin, gr.dbSegmentOffset)
+			assert.False(t, gr.isIPv6)
+		}
 	})
 }
