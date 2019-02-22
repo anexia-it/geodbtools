@@ -8,8 +8,8 @@ import (
 	geodbtools "github.com/anexia-it/geodbtools"
 	gomock "github.com/golang/mock/gomock"
 	io "io"
+	net "net"
 	reflect "reflect"
-	time "time"
 )
 
 // MockType is a mock of Type interface
@@ -33,6 +33,20 @@ func NewMockType(ctrl *gomock.Controller) *MockType {
 // EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockType) EXPECT() *MockTypeMockRecorder {
 	return m.recorder
+}
+
+// DatabaseSegmentOffset mocks base method
+func (m *MockType) DatabaseSegmentOffset(arg0 geodbtools.ReaderSource, arg1 DatabaseTypeID, arg2 int64) uint32 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DatabaseSegmentOffset", arg0, arg1, arg2)
+	ret0, _ := ret[0].(uint32)
+	return ret0
+}
+
+// DatabaseSegmentOffset indicates an expected call of DatabaseSegmentOffset
+func (mr *MockTypeMockRecorder) DatabaseSegmentOffset(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DatabaseSegmentOffset", reflect.TypeOf((*MockType)(nil).DatabaseSegmentOffset), arg0, arg1, arg2)
 }
 
 // DatabaseType mocks base method
@@ -65,20 +79,33 @@ func (mr *MockTypeMockRecorder) EncodeTreeNode(arg0, arg1 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EncodeTreeNode", reflect.TypeOf((*MockType)(nil).EncodeTreeNode), arg0, arg1)
 }
 
-// NewReader mocks base method
-func (m *MockType) NewReader(arg0 geodbtools.ReaderSource, arg1 DatabaseTypeID, arg2 string, arg3 *time.Time) (geodbtools.Reader, geodbtools.Metadata, error) {
+// IPVersion mocks base method
+func (m *MockType) IPVersion(arg0 DatabaseTypeID) geodbtools.IPVersion {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewReader", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(geodbtools.Reader)
-	ret1, _ := ret[1].(geodbtools.Metadata)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret := m.ctrl.Call(m, "IPVersion", arg0)
+	ret0, _ := ret[0].(geodbtools.IPVersion)
+	return ret0
 }
 
-// NewReader indicates an expected call of NewReader
-func (mr *MockTypeMockRecorder) NewReader(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+// IPVersion indicates an expected call of IPVersion
+func (mr *MockTypeMockRecorder) IPVersion(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewReader", reflect.TypeOf((*MockType)(nil).NewReader), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IPVersion", reflect.TypeOf((*MockType)(nil).IPVersion), arg0)
+}
+
+// NewRecord mocks base method
+func (m *MockType) NewRecord(arg0 geodbtools.ReaderSource, arg1 *net.IPNet, arg2 uint32) (geodbtools.Record, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewRecord", arg0, arg1, arg2)
+	ret0, _ := ret[0].(geodbtools.Record)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewRecord indicates an expected call of NewRecord
+func (mr *MockTypeMockRecorder) NewRecord(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewRecord", reflect.TypeOf((*MockType)(nil).NewRecord), arg0, arg1, arg2)
 }
 
 // NewWriter mocks base method
@@ -94,4 +121,18 @@ func (m *MockType) NewWriter(arg0 io.Writer, arg1 geodbtools.IPVersion) (geodbto
 func (mr *MockTypeMockRecorder) NewWriter(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewWriter", reflect.TypeOf((*MockType)(nil).NewWriter), arg0, arg1)
+}
+
+// RecordLength mocks base method
+func (m *MockType) RecordLength(arg0 DatabaseTypeID) uint {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecordLength", arg0)
+	ret0, _ := ret[0].(uint)
+	return ret0
+}
+
+// RecordLength indicates an expected call of RecordLength
+func (mr *MockTypeMockRecorder) RecordLength(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordLength", reflect.TypeOf((*MockType)(nil).RecordLength), arg0)
 }

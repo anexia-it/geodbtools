@@ -18,6 +18,7 @@ var (
 const (
 	structureInfoMaxSize = 20
 	databaseInfoMaxSize  = 100
+	maxRecordLength      = 4
 )
 
 var _ geodbtools.Format = format{}

@@ -3,8 +3,8 @@ package mmdatformat
 import (
 	"errors"
 	"io"
+	"net"
 	"sync"
-	"time"
 
 	"github.com/anexia-it/geodbtools"
 )
@@ -31,12 +31,21 @@ type Type interface {
 	// DatabaseType returns the database type
 	DatabaseType() geodbtools.DatabaseType
 
+	// IPVersion returns the IP version
+	IPVersion(dbTypeID DatabaseTypeID) geodbtools.IPVersion
+
+	// RecordLength returns the record length
+	RecordLength(dbTypeID DatabaseTypeID) uint
+
+	// NewRecord constructs a new record given a reader source and a value found inside the tree
+	NewRecord(source geodbtools.ReaderSource, matchingNetwork *net.IPNet, value uint32) (record geodbtools.Record, err error)
+
+	// DatabaseSegmentOffset returns the database segment offset
+	DatabaseSegmentOffset(source geodbtools.ReaderSource, dbTypeID DatabaseTypeID, structureInfoOffset int64) uint32
+
 	// EncodeTreeNode encodes a given tree node and returns its representation as a byte-slice, along with additional
 	// nodes that need processing
 	EncodeTreeNode(position *uint32, node *geodbtools.RecordTree) (b []byte, additionalNodes []*geodbtools.RecordTree, err error)
-
-	// NewReader returns a new database reader, given generic information obtained from the source
-	NewReader(source geodbtools.ReaderSource, dbType DatabaseTypeID, dbInfo string, buildTime *time.Time) (reader geodbtools.Reader, meta geodbtools.Metadata, err error)
 
 	// NewWriter returns a new database writer
 	NewWriter(w io.Writer, ipVersion geodbtools.IPVersion) (writer geodbtools.Writer, err error)

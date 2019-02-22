@@ -63,19 +63,28 @@ func (mr *metaReader) setupDatabaseInfo(dataSize int64) (err error) {
 		}
 	}
 
+	if mr.buildTime == nil {
+		now := time.Now()
+		mr.buildTime = &now
+	}
+
 	return
 }
 
-func (mr *metaReader) setupStructInfo(dataSize int64) (err error) {
+func (mr *metaReader) setupStructInfo(dataSize int64) (structureInfoOffset int64, err error) {
 	structInfoBytes := make([]byte, structureInfoMaxSize)
 
 	if _, err = mr.source.ReadAt(structInfoBytes, dataSize-structureInfoMaxSize); err != nil {
 		return
 	}
 
+	structureInfoOffset = -1
 	structInfoStart := int64(bytes.LastIndex(structInfoBytes, []byte{0xff, 0xff, 0xff}))
 	if structInfoStart >= 0 && (structInfoStart+3) < dataSize {
 		mr.dbType = DatabaseTypeID(structInfoBytes[structInfoStart+3])
+		if (structInfoStart + 4) < dataSize {
+			structureInfoOffset = structInfoStart + 3
+		}
 	}
 
 	return
@@ -89,7 +98,8 @@ func (mr *metaReader) setup() (reader geodbtools.Reader, meta geodbtools.Metadat
 		return
 	}
 
-	if err = mr.setupStructInfo(dataSize); err != nil {
+	var structureInfoOffset int64
+	if structureInfoOffset, err = mr.setupStructInfo(dataSize); err != nil {
 		return
 	}
 
@@ -101,7 +111,25 @@ func (mr *metaReader) setup() (reader geodbtools.Reader, meta geodbtools.Metadat
 		mr.dbType += DatabaseTypeIDBase
 	}
 
-	reader, meta, err = t.NewReader(mr.source, mr.dbType, mr.dbInfo, mr.buildTime)
+	ipVersion := t.IPVersion(mr.dbType)
+	if ipVersion == geodbtools.IPVersionUndefined {
+		err = geodbtools.ErrUnsupportedIPVersion
+		return
+	}
+
+	if reader, err = NewGenericReader(mr.source, t, mr.dbType, structureInfoOffset, ipVersion == geodbtools.IPVersion6); err != nil {
+		return
+	}
+
+	meta = geodbtools.Metadata{
+		Type:               t.DatabaseType(),
+		BuildTime:          *mr.buildTime,
+		Description:        mr.dbInfo,
+		MajorFormatVersion: 1,
+		MinorFormatVersion: 0,
+		IPVersion:          ipVersion,
+	}
+
 	return
 }
 

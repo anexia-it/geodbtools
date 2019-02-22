@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/anexia-it/bitmap"
 	"github.com/anexia-it/geodbtools"
@@ -18,86 +17,58 @@ func TestCountryType_DatabaseType(t *testing.T) {
 	assert.EqualValues(t, geodbtools.DatabaseTypeCountry, countryType{}.DatabaseType())
 }
 
-func TestCountryType_NewReader(t *testing.T) {
-	t.Run("UnsupportedDBType", func(t *testing.T) {
-		reader, meta, err := countryType{}.NewReader(nil, DatabaseTypeIDBase, "test", nil)
-		assert.Nil(t, reader)
-		assert.EqualValues(t, geodbtools.Metadata{}, meta)
-		assert.EqualError(t, err, geodbtools.ErrUnsupportedDatabaseType.Error())
+func TestCountryType_IPVersion(t *testing.T) {
+	t.Run("CountryEdition", func(t *testing.T) {
+		assert.EqualValues(t, geodbtools.IPVersion4, countryType{}.IPVersion(DatabaseTypeIDCountryEdition))
 	})
 
-	t.Run("Country", func(t *testing.T) {
-		t.Run("IPv4", func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+	t.Run("CountryEditionV6", func(t *testing.T) {
+		assert.EqualValues(t, geodbtools.IPVersion6, countryType{}.IPVersion(DatabaseTypeIDCountryEditionV6))
+	})
 
-			source := NewMockReaderSource(ctrl)
+	t.Run("Unsupported", func(t *testing.T) {
+		assert.EqualValues(t, geodbtools.IPVersionUndefined, countryType{}.IPVersion(DatabaseTypeIDBase))
+	})
+}
 
-			buildTime := time.Now()
+func TestCountryType_RecordLength(t *testing.T) {
+	t.Run("CountryEdition", func(t *testing.T) {
+		assert.EqualValues(t, 3, countryType{}.RecordLength(DatabaseTypeIDCountryEdition))
+	})
 
-			reader, meta, err := countryType{}.NewReader(source, DatabaseTypeIDCountryEdition, "test", &buildTime)
-			assert.NoError(t, err)
-			assert.EqualValues(t, geodbtools.Metadata{
-				Type:               geodbtools.DatabaseTypeCountry,
-				BuildTime:          buildTime,
-				Description:        "test",
-				MajorFormatVersion: 1,
-				MinorFormatVersion: 0,
-				IPVersion:          geodbtools.IPVersion4,
-			}, meta)
-			if assert.NotNil(t, reader) && assert.IsType(t, &readerCountry{}, reader) {
-				r := reader.(*readerCountry)
-				assert.EqualValues(t, source, r.source)
-				assert.EqualValues(t, DatabaseTypeIDCountryEdition, r.dbType)
-			}
-		})
+	t.Run("CountryEditionV6", func(t *testing.T) {
+		assert.EqualValues(t, 3, countryType{}.RecordLength(DatabaseTypeIDCountryEditionV6))
+	})
 
-		t.Run("IPv6", func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+	t.Run("Unsupported", func(t *testing.T) {
+		assert.EqualValues(t, 0, countryType{}.RecordLength(DatabaseTypeIDBase))
+	})
+}
 
-			source := NewMockReaderSource(ctrl)
+func TestCountryType_DatabaseSegmentOffset(t *testing.T) {
+	assert.EqualValues(t, countryBegin, countryType{}.DatabaseSegmentOffset(nil, 0, 0))
+}
 
-			buildTime := time.Now()
+func TestCountryType_NewRecord(t *testing.T) {
+	t.Run("OK", func(t *testing.T) {
+		_, network, err := net.ParseCIDR("127.0.0.1/32")
+		require.NoError(t, err)
+		require.NotNil(t, network)
 
-			reader, meta, err := countryType{}.NewReader(source, DatabaseTypeIDCountryEditionV6, "test", &buildTime)
-			assert.NoError(t, err)
-			assert.EqualValues(t, geodbtools.Metadata{
-				Type:               geodbtools.DatabaseTypeCountry,
-				BuildTime:          buildTime,
-				Description:        "test",
-				MajorFormatVersion: 1,
-				MinorFormatVersion: 0,
-				IPVersion:          geodbtools.IPVersion6,
-			}, meta)
-			if assert.NotNil(t, reader) && assert.IsType(t, &readerCountry{}, reader) {
-				r := reader.(*readerCountry)
-				assert.EqualValues(t, source, r.source)
-				assert.EqualValues(t, DatabaseTypeIDCountryEditionV6, r.dbType)
-			}
-		})
+		expectedRecord := &countryRecord{
+			network:     network,
+			countryCode: "AT",
+		}
 
-		t.Run("IPv4NilBuildTime", func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+		record, err := countryType{}.NewRecord(nil, network, 15)
+		assert.NoError(t, err)
+		assert.EqualValues(t, expectedRecord, record)
+	})
 
-			source := NewMockReaderSource(ctrl)
-
-			reader, meta, err := countryType{}.NewReader(source, DatabaseTypeIDCountryEdition, "test", nil)
-			assert.NoError(t, err)
-			assert.EqualValues(t, geodbtools.DatabaseTypeCountry, meta.Type)
-			assert.EqualValues(t, "test", meta.Description)
-			assert.EqualValues(t, 1, meta.MajorFormatVersion)
-			assert.EqualValues(t, 0, meta.MinorFormatVersion)
-			assert.EqualValues(t, geodbtools.IPVersion4, meta.IPVersion)
-			assert.WithinDuration(t, time.Now(), meta.BuildTime, time.Second)
-
-			if assert.NotNil(t, reader) && assert.IsType(t, &readerCountry{}, reader) {
-				r := reader.(*readerCountry)
-				assert.EqualValues(t, source, r.source)
-				assert.EqualValues(t, DatabaseTypeIDCountryEdition, r.dbType)
-			}
-		})
+	t.Run("InvalidCountryCode", func(t *testing.T) {
+		record, err := countryType{}.NewRecord(nil, nil, 256)
+		assert.Nil(t, record)
+		assert.EqualError(t, err, ErrCountryNotFound.Error())
 	})
 }
 
@@ -143,10 +114,8 @@ func TestReaderCountry_RecordTree(t *testing.T) {
 		source := NewMockReaderSource(ctrl)
 		source.EXPECT().ReadAt(gomock.Any(), int64(0)).Return(-1, testErr)
 
-		reader := &readerCountry{
-			source: source,
-			dbType: DatabaseTypeIDCountryEdition,
-		}
+		reader, err := NewGenericReader(source, countryType{}, DatabaseTypeIDCountryEdition, -1, false)
+		require.NoError(t, err)
 
 		tree, err := reader.RecordTree(geodbtools.IPVersion4)
 		assert.Nil(t, tree)
@@ -167,10 +136,8 @@ func TestReaderCountry_RecordTree(t *testing.T) {
 			return
 		})
 
-		reader := &readerCountry{
-			source: source,
-			dbType: DatabaseTypeIDCountryEdition,
-		}
+		reader, err := NewGenericReader(source, countryType{}, DatabaseTypeIDCountryEdition, -1, false)
+		require.NoError(t, err)
 
 		tree, err := reader.RecordTree(geodbtools.IPVersion4)
 		assert.NoError(t, err)
@@ -218,10 +185,8 @@ func TestReaderCountry_RecordTree(t *testing.T) {
 			return
 		})
 
-		reader := &readerCountry{
-			source: source,
-			dbType: DatabaseTypeIDCountryEdition,
-		}
+		reader, err := NewGenericReader(source, countryType{}, DatabaseTypeIDCountryEdition, -1, false)
+		require.NoError(t, err)
 
 		tree, err := reader.RecordTree(geodbtools.IPVersion4)
 		assert.NoError(t, err)
@@ -273,10 +238,8 @@ func TestReaderCountry_LookupIP(t *testing.T) {
 		source.EXPECT().ReadAt(gomock.Any(), int64(0)).Return(-1, testErr)
 		source.EXPECT().Size().Return(int64(6))
 
-		reader := &readerCountry{
-			source: source,
-			dbType: DatabaseTypeIDCountryEdition,
-		}
+		reader, err := NewGenericReader(source, countryType{}, DatabaseTypeIDCountryEdition, -1, false)
+		require.NoError(t, err)
 
 		record, err := reader.LookupIP(net.ParseIP("127.0.0.1"))
 		assert.Nil(t, record)
@@ -293,10 +256,8 @@ func TestReaderCountry_LookupIP(t *testing.T) {
 		source.EXPECT().ReadAt(gomock.Any(), int64(3)).Return(-1, testErr)
 		source.EXPECT().Size().Return(int64(6))
 
-		reader := &readerCountry{
-			source: source,
-			dbType: DatabaseTypeIDCountryEdition,
-		}
+		reader, err := NewGenericReader(source, countryType{}, DatabaseTypeIDCountryEdition, -1, false)
+		require.NoError(t, err)
 
 		record, err := reader.LookupIP(net.ParseIP("128.0.0.1"))
 		assert.Nil(t, record)
@@ -327,10 +288,8 @@ func TestReaderCountry_LookupIP(t *testing.T) {
 
 		source.EXPECT().Size().Times(2).Return(int64(6))
 
-		reader := &readerCountry{
-			source: source,
-			dbType: DatabaseTypeIDCountryEdition,
-		}
+		reader, err := NewGenericReader(source, countryType{}, DatabaseTypeIDCountryEdition, -1, false)
+		require.NoError(t, err)
 
 		record, err := reader.LookupIP(net.ParseIP("127.0.0.1"))
 		assert.NoError(t, err)
@@ -369,10 +328,8 @@ func TestReaderCountry_LookupIP(t *testing.T) {
 
 		source.EXPECT().Size().Times(2).Return(int64(6))
 
-		reader := &readerCountry{
-			source: source,
-			dbType: DatabaseTypeIDCountryEditionV6,
-		}
+		reader, err := NewGenericReader(source, countryType{}, DatabaseTypeIDCountryEdition, -1, true)
+		require.NoError(t, err)
 
 		record, err := reader.LookupIP(net.ParseIP("127.0.0.1"))
 		assert.NoError(t, err)
@@ -427,10 +384,8 @@ func TestReaderCountry_LookupIP(t *testing.T) {
 
 		source.EXPECT().Size().Times(2).Return(int64(18))
 
-		reader := &readerCountry{
-			source: source,
-			dbType: DatabaseTypeIDCountryEdition,
-		}
+		reader, err := NewGenericReader(source, countryType{}, DatabaseTypeIDCountryEdition, -1, false)
+		require.NoError(t, err)
 
 		record, err := reader.LookupIP(net.ParseIP("127.0.0.1"))
 		assert.NoError(t, err)
@@ -461,10 +416,8 @@ func TestReaderCountry_LookupIP(t *testing.T) {
 
 		source.EXPECT().Size().Return(int64(12))
 
-		reader := &readerCountry{
-			source: source,
-			dbType: DatabaseTypeIDCountryEdition,
-		}
+		reader, err := NewGenericReader(source, countryType{}, DatabaseTypeIDCountryEdition, -1, false)
+		require.NoError(t, err)
 
 		record, err := reader.LookupIP(net.ParseIP("127.0.0.1"))
 		assert.Nil(t, record)
@@ -477,10 +430,8 @@ func TestReaderCountry_LookupIP(t *testing.T) {
 
 		source := NewMockReaderSource(ctrl)
 
-		reader := &readerCountry{
-			source: source,
-			dbType: DatabaseTypeIDCountryEdition,
-		}
+		reader, err := NewGenericReader(source, countryType{}, DatabaseTypeIDCountryEdition, -1, false)
+		require.NoError(t, err)
 
 		record, err := reader.LookupIP(net.ParseIP("2001:db8::1"))
 		assert.Nil(t, record)
@@ -503,10 +454,8 @@ func TestReaderCountry_LookupIP(t *testing.T) {
 
 		source.EXPECT().Size().Return(int64(6))
 
-		reader := &readerCountry{
-			source: source,
-			dbType: DatabaseTypeIDCountryEdition,
-		}
+		reader, err := NewGenericReader(source, countryType{}, DatabaseTypeIDCountryEdition, -1, false)
+		require.NoError(t, err)
 
 		record, err := reader.LookupIP(net.ParseIP("127.0.0.1"))
 		assert.Nil(t, record)
